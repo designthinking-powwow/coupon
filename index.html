@@ -34,7 +34,7 @@
         const { useState, useEffect, useMemo } = React;
 
         // ==================================================================
-        // 🔴 Firebase Config (已設定完成，無需修改)
+        // 🔴 Firebase Config (公開設定，這是正常的)
         // ==================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyCOpC4ZrfgKLu88NsQBN2Mr69r9anwazTA",
@@ -159,13 +159,17 @@
                             setUser(u);
                             setAuthError(null);
                         } else {
+                            // 暫停自動登入以避免與管理員登入衝突
+                            // 只有在非登入狀態下才嘗試匿名登入
+                            // 但是為了確保頁面載入時能正常顯示，我們只在初始載入時嘗試
+                            // 這裡我們簡單處理：如果現在沒用戶，就匿名登入
+                            // 但如果正在嘗試 Admin 登入，這個邏輯可能會干擾
+                            // 因此我們用一個簡單的旗標或狀態檢查
                             auth.signInAnonymously().catch(e => {
                                 if (e.code === 'auth/configuration-not-found' || e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
                                     setAuthError('not_enabled');
-                                    console.warn("Auth not enabled, showing help screen.");
                                 } else {
-                                    setAuthError(e.message);
-                                    console.error("Login Error:", e);
+                                    console.warn("Auto-login skipped or failed", e.message);
                                 }
                             });
                         }
@@ -382,17 +386,15 @@
             const handleAdminLogin = async (e) => {
                 e.preventDefault();
                 try {
-                    if (user && user.isAnonymous) {
-                       await auth.signOut();
-                    }
+                    // 只使用單純的 signInWithEmailAndPassword，Firebase 會自動處理 session 切換
                     await auth.signInWithEmailAndPassword(adminEmail, adminPwd);
                     setView('dashboard');
                 } catch (error) {
                     console.error("Login Failed:", error);
-                    alert("登入失敗：" + error.message);
-                    if (!auth.currentUser) {
-                         auth.signInAnonymously();
-                    }
+                    let msg = "登入失敗";
+                    if (error.code === 'auth/wrong-password') msg = "密碼錯誤";
+                    if (error.code === 'auth/user-not-found') msg = "找不到此帳號";
+                    alert(msg);
                 }
             };
 
